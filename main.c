@@ -4,6 +4,7 @@
 #include <png.h>
 
 #define HEADER_BYTES 8
+#define TILE_SIZE 8
 #define CONVERT_TO_SNES_COLOR(red, green, blue) (((blue & 0xF8) << 7) | ((green & 0xF8) << 2) | (red >> 3))
 
 void close_file_exit(FILE* fp, int exit_code);
@@ -13,6 +14,8 @@ int detect_png(FILE* fp);
 int initialize_libpng(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info);
 int detect_palette();
 void convert_palette(png_structp png_ptr, png_infop info_ptr);
+void read_image(png_structp png_ptr, png_infop info_ptr);
+uint16_t convert_tile(png_bytep row_pointer, int col_offset);
 
 void close_file_exit(FILE* fp, int exit_code)
 {
@@ -62,9 +65,21 @@ int main(int argc, char *argv[])
     close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, -4);
   }
 
-  convert_palette(png_ptr, info_ptr);
-  close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, 0);
+  //Verify the validity of the PLTE chunk
+  if(!png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
+  {
+    printf("PLTE chunk is invalid");
+    close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, -4);
+  }
 
+  //Convert palette to the format used by the SNES
+  convert_palette(png_ptr, info_ptr);
+
+  printf("Assuming %dx%d background tiles\n", TILE_SIZE, TILE_SIZE);
+  printf("Assuming 2 bitplanes\n");
+  read_image(png_ptr, info_ptr);
+
+  close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, 0);
   return 0;
 }
 
@@ -136,11 +151,74 @@ void convert_palette(png_structp png_ptr, png_infop info_ptr)
   for(unsigned int i = 0; i < num_palette; i++)
   {
     uint16_t nes_color = CONVERT_TO_SNES_COLOR(palette[i].red, palette[i].green, palette[i].blue);
-    printf("%04X", nes_color);
+    printf("$%04X", nes_color);
 
     if(i < (num_palette - 1))
       printf(", ");
   }
 
   printf("\n");
+}
+
+void read_image(png_structp png_ptr, png_infop info_ptr)
+{
+  //Get image size and bit depth
+  unsigned int height = png_get_image_height(png_ptr, info_ptr);
+  unsigned int width = png_get_image_width(png_ptr, info_ptr);
+  unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+
+  //Get number of horizontal and vertical tiles to process
+  unsigned int horizontal_tiles = width / TILE_SIZE;
+  unsigned int vertical_tiles = height / TILE_SIZE;
+
+  //Get number of bytes per row
+  size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+
+  //Allocate space for 8 rows
+  png_bytep* row_pointers = (png_bytep*)malloc(sizeof(png_bytep) * TILE_SIZE);
+  for(int i = 0; i < TILE_SIZE; i++)
+    row_pointers[i] =  (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+
+  printf("Image size is %dx%d, bit depth is %d\n", width, height, bit_depth);
+  printf("Tile count: %d\n", horizontal_tiles * vertical_tiles);
+  printf("VRAM section is %d bytes long\n", 2 * TILE_SIZE * horizontal_tiles * vertical_tiles);
+  printf(".db ");
+
+  for(size_t i = 0; i < vertical_tiles; i++)
+  {
+    //Read rows
+    png_read_rows(png_ptr, row_pointers, NULL, TILE_SIZE);
+
+    //For each horizontal tile
+    for(size_t j = 0; j < horizontal_tiles; j++)
+    {
+      //For each row in the tile
+      for(size_t k = 0; k < TILE_SIZE; k++)
+      {
+        uint16_t data = convert_tile(row_pointers[k], j);
+        printf("%02X, %02X", data >> 8, data & 0xFF);
+
+        if((i < (vertical_tiles-1)) || (j < (horizontal_tiles-1)) || (k < (TILE_SIZE-1)))
+          printf(", ");
+        }
+    }
+  }
+
+  printf("\n");
+}
+
+uint16_t convert_tile(png_bytep row_pointer, int col_offset)
+{
+  uint8_t bitplane1 = 0, bitplane2 = 0;
+  for(int i = 0; i < TILE_SIZE; i++)
+  {
+    //Expand to 8-bits palette index
+    char color = (row_pointer[col_offset] >> (TILE_SIZE-1-i)) & 0x01;
+
+    //Store on 2 bitplanes
+    bitplane1 |= (color & 0x02) << (TILE_SIZE-1-i);
+    bitplane2 |= (color & 0x01) << (TILE_SIZE-1-i);
+  }
+
+  return (bitplane1 << 8) | bitplane2;
 }
