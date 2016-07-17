@@ -10,7 +10,7 @@ That's about it. The program will return different errors along the way if
 there are problems with the supplied PNG file.
 
 ## Compiling
-`make` and you're in business.
+`make` and you're in business. The project depends only on libpng.
 
 ## Creating Color-Indexed PNGs
 In GIMP, select Image -> Mode -> Indexed...
