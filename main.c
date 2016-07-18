@@ -172,7 +172,7 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_coun
           if((output_bytes % 16) == 0)
             fprintf(stdout, "\n\t.db ");
 
-          fprintf(stdout, "$%02X", bitplanes[i]);
+          fprintf(stdout, "$%02X", bitplanes[l]);
 
           if((output_bytes % 16) < 15)
             fprintf(stdout, ",  ");
@@ -189,23 +189,29 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_coun
 uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth)
 {
   uint8_t* bitplanes = (uint8_t*)malloc(sizeof(uint8_t) * bitplane_count);
-
   uint and_mask = 0xFF >> (8 - bit_depth);
+
+  for(size_t i = 0; i < bitplane_count; i++)
+    bitplanes[i] = 0;
+
   for(size_t i = 0; i < DEFAULT_TILE_SIZE; i++)
   {
     //Calculate number of bits to shift right
-    uint dfi1 = DEFAULT_TILE_SIZE - i - 1;
-    uint right_shift = bit_depth * dfi1;
+    uint row = DEFAULT_TILE_SIZE - i - 1;
+    uint right_shift = bit_depth * row;
 
     uint offset = right_shift / 8;
     right_shift %= 8;
 
     //Expand to 8-bits palette index
-    char color = (row_pointer[(col*bit_depth)+offset] >> right_shift) & and_mask;
+    uint8_t color = (row_pointer[(col*bit_depth)+offset] >> right_shift) & and_mask;
 
     //Store on bitplanes
     for(size_t j = 0; j < bitplane_count; j++)
-      bitplanes[i] |= (color & (1 << (bitplane_count-j-1))) << dfi1;
+    {
+      uint plane = bitplane_count-j-1;
+      bitplanes[j] |= (((color & (1 << plane))) >> plane) << row;
+    }
   }
 
   return bitplanes;
