@@ -12,6 +12,8 @@
 
 void convert_palette(png_structp png_ptr, png_infop info_ptr);
 void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_count, int tilesize);
+void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth);
+void output_byte_text(uint8_t byte);
 
 uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth);
 int parse (int argc, char **argv);
@@ -162,28 +164,27 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_coun
 
     //For each horizontal tile
     for(size_t j = 0; j < horizontal_tiles; j++)
+      convert_tile(row_pointers, j, bitplane_count, bit_depth);
+  }
+}
+
+void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth)
+{
+  uint8_t** rows = (uint8_t**)malloc(DEFAULT_TILE_SIZE * sizeof(uint8_t*));
+
+  //For each row in the tile
+  for(size_t i = 0; i < DEFAULT_TILE_SIZE; i++)
+    rows[i] = convert_to_bitplanes(row_pointers[i], column, bitplane_count, bit_depth);
+
+  for(size_t i = 0; i < bitplane_count; i+=2)
+  {
+    for(size_t j = 0; j < DEFAULT_TILE_SIZE; j++)
     {
-      //For each row in the tile
-      for(size_t k = 0; k < DEFAULT_TILE_SIZE; k++)
-      {
-        uint8_t* bitplanes = convert_to_bitplanes(row_pointers[k], j, bitplane_count, bit_depth);
-        for(size_t l = 0; l < bitplane_count; l++)
-        {
-          if((output_bytes % 16) == 0)
-            fprintf(stdout, "\n\t.db ");
-
-          fprintf(stdout, "$%02X", bitplanes[l]);
-
-          if((output_bytes % 16) < 15)
-            fprintf(stdout, ",  ");
-
-          output_bytes++;
-        }
-      }
+        //Output two bitplanes for each
+        output_byte_text(rows[j][i]);
+        output_byte_text(rows[j][i+1]);
     }
   }
-
-  fprintf(stdout, "\n");
 }
 
 uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth)
@@ -215,4 +216,19 @@ uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count
   }
 
   return bitplanes;
+}
+
+void output_byte_text(uint8_t byte)
+{
+  static int output_bytes = 0;
+
+  if((output_bytes % 16) == 0)
+    fprintf(stdout, "\n\t.db ");
+
+  fprintf(stdout, "$%02X", byte);
+
+  if((output_bytes % 16) < 15)
+    fprintf(stdout, ",  ");
+
+  output_bytes++;
 }
