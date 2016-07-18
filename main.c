@@ -11,9 +11,9 @@
 #define CONVERT_TO_SNES_COLOR(red, green, blue) (((blue & 0xF8) << 7) | ((green & 0xF8) << 2) | (red >> 3))
 
 void convert_palette(png_structp png_ptr, png_infop info_ptr);
-void convert_to_tiles(png_structp png_ptr, png_infop info_ptr);
-uint16_t convert_to_bitplanes(png_bytep row_pointer, int col_offset);
+void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_count, int tilesize);
 
+uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth);
 int parse (int argc, char **argv);
 
 uint bitplanes;
@@ -43,6 +43,8 @@ int main(int argc, char *argv[])
   //Parse command-line arguments
   struct arguments args = parse_arguments(argc, argv);
 
+  int bitplane_count, tilesize;
+
   //Open the file
   fp = fopen(args.input_file, "rb");
   if (!fp)
@@ -64,27 +66,36 @@ int main(int argc, char *argv[])
 
   //Print tilesize
   if(args.tilesize == 0)
-    fprintf(stderr, "Assuming %dx%d background tiles\n", DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE);
+  {
+    tilesize = DEFAULT_TILE_SIZE;
+    fprintf(stderr, "Assuming %dx%d background tiles\n", tilesize, tilesize);
+  }
   else
-    fprintf(stderr, "Using %dx%d background tiles\n", args.tilesize, args.tilesize);
+  {
+    tilesize = args.tilesize;
+    fprintf(stderr, "Using %dx%d background tiles\n", tilesize, tilesize);
+  }
 
   //Print bitplanes used
   if(args.bitplanes != 0)
-    fprintf(stderr, "Using %d bitplanes\n", args.bitplanes);
+  {
+    bitplane_count = args.bitplanes;
+    fprintf(stderr, "Using %d bitplanes\n", bitplane_count);
+  }
   else
   {
     //Get bit depth from png file
-    int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
-    if(bit_depth < 2)
-      bit_depth = 2;
-    fprintf(stderr, "Assuming %d bitplanes\n", bit_depth);
+    int bitplane_count = png_get_bit_depth(png_ptr, info_ptr);
+    if(bitplane_count < 2)
+      bitplane_count = 2;
+    fprintf(stderr, "Assuming %d bitplanes\n", bitplane_count);
   }
 
   //Convert palette to the format used by the SNES
   convert_palette(png_ptr, info_ptr);
 
   //Convert image data in PNG to tiles
-  convert_to_tiles(png_ptr, info_ptr);
+  convert_to_tiles(png_ptr, info_ptr, bitplane_count, tilesize);
 
   return close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, 0);
 }
@@ -116,7 +127,7 @@ void convert_palette(png_structp png_ptr, png_infop info_ptr)
 
 }
 
-void convert_to_tiles(png_structp png_ptr, png_infop info_ptr)
+void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_count, int tilesize)
 {
   //Get image size and bit depth
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
@@ -126,6 +137,9 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr)
   //Get number of horizontal and vertical tiles to process
   unsigned int horizontal_tiles = width / DEFAULT_TILE_SIZE;
   unsigned int vertical_tiles = height / DEFAULT_TILE_SIZE;
+
+  //Keep tracks of outputed bytes
+  unsigned int output_bytes = 0;
 
   //Get number of bytes per row
   size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
@@ -138,9 +152,9 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr)
   //Print information on the image
   fprintf(stderr, "Image size is %dx%d, bit depth is %d\n", width, height, bit_depth);
   fprintf(stderr, "Tile count: %d\n", horizontal_tiles * vertical_tiles);
-  fprintf(stderr, "VRAM section is %d bytes long\n", 2 * DEFAULT_TILE_SIZE * horizontal_tiles * vertical_tiles);
+  fprintf(stderr, "VRAM section is %d bytes long\n", bitplane_count * DEFAULT_TILE_SIZE * horizontal_tiles * vertical_tiles);
 
-  fprintf(stdout, "TILES:\n");
+  fprintf(stdout, "TILES:");
   for(size_t i = 0; i < vertical_tiles; i++)
   {
     //Read rows
@@ -149,35 +163,50 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr)
     //For each horizontal tile
     for(size_t j = 0; j < horizontal_tiles; j++)
     {
-      fprintf(stdout, "\t.db ");
-
       //For each row in the tile
       for(size_t k = 0; k < DEFAULT_TILE_SIZE; k++)
       {
-        uint16_t data = convert_to_bitplanes(row_pointers[k], j);
-        fprintf(stdout, "$%02X, $%02X", data >> 8, data & 0xFF);
+        uint8_t* bitplanes = convert_to_bitplanes(row_pointers[k], j, bitplane_count, bit_depth);
+        for(size_t l = 0; l < bitplane_count; l++)
+        {
+          if((output_bytes % 16) == 0)
+            fprintf(stdout, "\n\t.db ");
 
-        if(k < (DEFAULT_TILE_SIZE-1))
-          fprintf(stdout, ", ");
+          fprintf(stdout, "$%02X", bitplanes[i]);
+
+          if((output_bytes % 16) < 15)
+            fprintf(stdout, ",  ");
+
+          output_bytes++;
+        }
       }
-
-        fprintf(stdout, "\n");
     }
   }
+
+  fprintf(stdout, "\n");
 }
 
-uint16_t convert_to_bitplanes(png_bytep row_pointer, int col_offset)
+uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth)
 {
-  uint8_t bitplane1 = 0, bitplane2 = 0;
-  for(int i = 0; i < DEFAULT_TILE_SIZE; i++)
-  {
-    //Expand to 8-bits palette index
-    char color = (row_pointer[col_offset] >> (DEFAULT_TILE_SIZE-1-i)) & 0x01;
+  uint8_t* bitplanes = (uint8_t*)malloc(sizeof(uint8_t) * bitplane_count);
 
-    //Store on 2 bitplanes
-    bitplane1 |= (color & 0x02) << (DEFAULT_TILE_SIZE-1-i);
-    bitplane2 |= (color & 0x01) << (DEFAULT_TILE_SIZE-1-i);
+  uint and_mask = 0xFF >> (8 - bit_depth);
+  for(size_t i = 0; i < DEFAULT_TILE_SIZE; i++)
+  {
+    //Calculate number of bits to shift right
+    uint dfi1 = DEFAULT_TILE_SIZE - i - 1;
+    uint right_shift = bit_depth * dfi1;
+
+    uint offset = right_shift / 8;
+    right_shift %= 8;
+
+    //Expand to 8-bits palette index
+    char color = (row_pointer[(col*bit_depth)+offset] >> right_shift) & and_mask;
+
+    //Store on bitplanes
+    for(size_t j = 0; j < bitplane_count; j++)
+      bitplanes[i] |= (color & (1 << (bitplane_count-j-1))) << dfi1;
   }
 
-  return (bitplane1 << 8) | bitplane2;
+  return bitplanes;
 }
