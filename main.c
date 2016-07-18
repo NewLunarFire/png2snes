@@ -10,9 +10,6 @@
 #define DEFAULT_TILE_SIZE 8
 #define CONVERT_TO_SNES_COLOR(red, green, blue) (((blue & 0xF8) << 7) | ((green & 0xF8) << 2) | (red >> 3))
 
-void close_file_exit(FILE* fp, int exit_code);
-void close_file_and_png_exit(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info, int exit_code);
-
 void convert_palette(png_structp png_ptr, png_infop info_ptr);
 void convert_to_tiles(png_structp png_ptr, png_infop info_ptr);
 uint16_t convert_to_bitplanes(png_bytep row_pointer, int col_offset);
@@ -22,13 +19,13 @@ int parse (int argc, char **argv);
 uint bitplanes;
 uint tilesize;
 
-void close_file_exit(FILE* fp, int exit_code)
+static inline int close_file_exit(FILE* fp, int exit_code)
 {
   fclose(fp);
   exit(exit_code);
 }
 
-void close_file_and_png_exit(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info, int exit_code)
+static inline int close_file_and_png_exit(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info, int exit_code)
 {
   png_destroy_read_struct(png_ptr, info_ptr, end_info);
   close_file_exit(fp, exit_code);
@@ -56,14 +53,14 @@ int main(int argc, char *argv[])
 
   //If file is not a PNG, quit
   if (!detect_png(fp))
-    close_file_exit(fp, -2);
+    return close_file_exit(fp, -2);
 
   //If initializing libpng failed, quit
   if(!initialize_libpng(fp, &png_ptr, &info_ptr, &end_info))
-    close_file_exit(fp, -3);
+    return close_file_exit(fp, -3);
 
   if(!detect_palette(png_ptr, info_ptr))
-    close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, -4);
+    return close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, -4);
 
   //Print tilesize
   if(args.tilesize == 0)
@@ -72,10 +69,16 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Using %dx%d background tiles\n", args.tilesize, args.tilesize);
 
   //Print bitplanes used
-  if(args.bitplanes == 0)
-    fprintf(stderr, "Assuming 2 bitplanes\n");
-  else
+  if(args.bitplanes != 0)
     fprintf(stderr, "Using %d bitplanes\n", args.bitplanes);
+  else
+  {
+    //Get bit depth from png file
+    int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+    if(bit_depth < 2)
+      bit_depth = 2;
+    fprintf(stderr, "Assuming %d bitplanes\n", bit_depth);
+  }
 
   //Convert palette to the format used by the SNES
   convert_palette(png_ptr, info_ptr);
@@ -83,8 +86,7 @@ int main(int argc, char *argv[])
   //Convert image data in PNG to tiles
   convert_to_tiles(png_ptr, info_ptr);
 
-  close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, 0);
-  return 0;
+  return close_file_and_png_exit(fp, &png_ptr, &info_ptr, &end_info, 0);
 }
 
 void convert_palette(png_structp png_ptr, png_infop info_ptr)
@@ -110,8 +112,8 @@ void convert_palette(png_structp png_ptr, png_infop info_ptr)
     if(i < (num_palette - 1))
       fprintf(stdout, ", ");
   }
-
   fprintf(stdout, "\n");
+
 }
 
 void convert_to_tiles(png_structp png_ptr, png_infop info_ptr)
