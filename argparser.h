@@ -5,6 +5,7 @@
   struct arguments
   {
     int verbose;
+    int binary;
     char *input_file;
     char *output_file;
     int bitplanes;

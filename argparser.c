@@ -3,6 +3,9 @@
 
 #include "argparser.h"
 
+#define BINARY 1
+#define BASENAME 2
+
 /* Version and bugs address */
 const char *argp_program_version = "png2snes beta";
 const char *argp_program_bug_address = "<tommy.savaria@protonmail.ch>";
@@ -17,9 +20,10 @@ static char args_doc[] = "INPUT_FILE";
 static struct argp_option options[] = {
   {"verbose",  'v', 0,      0,  "Produce more verbose output" },
   {"quiet",    'q', 0,      0,  "Don't produce any output" },
-  {"output",   'o', "FILE", 0, "Output to FILE instead of standard output" },
-  {"bitplanes", 'b', "PLANES", 0, "Number of bitplanes to generate per tile (2, 4 or 8)"},
-  {"tilesize", 't', "SIZE", 0, "Size of tiles (8x8 or 16x16) to generate"},
+  {"output",   'o', "BASENAME", 0, "Output to file instead of standard output" },
+  {"bitplanes", 'b', "PLANES", 0, "Number of bitplanes per tile (2,4 or 8)"},
+  {"tilesize", 't', "SIZE", 0, "Size of tiles (8x8 or 16x16)"},
+  {"binary", BINARY, 0, 0, "Output to binary format"},
   { 0 }
 };
 
@@ -74,7 +78,10 @@ error_t parse_opt (int key, char *arg, struct argp_state *state)
       arguments->verbose = 0;
       break;
     case 'v':
-      arguments->verbose++;
+      arguments->verbose = 1;
+      break;
+    case BINARY:
+      arguments->binary = 1;
       break;
     case 'o':
       arguments->output_file = arg;
@@ -125,6 +132,7 @@ struct arguments parse_arguments(int argc, char **argv)
 
   /* Default values. */
   arguments.verbose = 1;
+  arguments.binary = 0;
   arguments.output_file = "-";
   arguments.bitplanes = 0;
   arguments.tilesize = 0;
