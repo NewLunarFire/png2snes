@@ -7,3 +7,6 @@ TARGET=png2snes
 
 all: $(SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(SRC) $(LDFLAGS) -o $(TARGET)
+
+clean:
+	rm *.asm *.cgr *.vra

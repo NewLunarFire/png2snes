@@ -11,9 +11,9 @@
 #define CONVERT_TO_SNES_COLOR(red, green, blue) (((blue & 0xF8) << 7) | ((green & 0xF8) << 2) | (red >> 3))
 
 void convert_palette(png_structp png_ptr, png_infop info_ptr, FILE* output);
-void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_count, int tilesize);
-void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth);
-void output_byte_text(uint8_t byte);
+void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, FILE* output, int bitplane_count, int tilesize);
+void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth, FILE* output);
+void output_byte_text(uint8_t byte, FILE* output);
 
 uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count, int bit_depth);
 
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Assuming %d bitplanes\n", bitplane_count);
   }
 
-  //Output
+  //Open output file for CGRAM
   if(strcmp(args.output_file, "-") == 0)
   {
     output = stdout;
@@ -127,8 +127,21 @@ int main(int argc, char *argv[])
   //Convert palette to the format used by the SNES
   convert_palette(png_ptr, info_ptr, output);
 
+  //Open output file for VRAM
+  if(binary)
+  {
+    fclose(output);
+    output = open_file(args.output_file, "vra", "w");
+
+    if(!output)
+    {
+      fprintf(stderr, "Could not create file %s.vra, aborting...\n", args.output_file);
+      return close_file_and_png_exit(input, &png_ptr, &info_ptr, &end_info, -5);
+    }
+  }
+
   //Convert image data in PNG to tiles
-  convert_to_tiles(png_ptr, info_ptr, bitplane_count, tilesize);
+  convert_to_tiles(png_ptr, info_ptr, output, bitplane_count, tilesize);
 
   fclose(output);
   return close_file_and_png_exit(input, &png_ptr, &info_ptr, &end_info, 0);
@@ -177,7 +190,7 @@ void convert_palette(png_structp png_ptr, png_infop info_ptr, FILE* output)
     fprintf(output, "\n");
 }
 
-void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_count, int tilesize)
+void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, FILE* output, int bitplane_count, int tilesize)
 {
   //Get image size and bit depth
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
@@ -204,7 +217,9 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_coun
   fprintf(stderr, "Tile count: %d\n", horizontal_tiles * vertical_tiles);
   fprintf(stderr, "VRAM section is %d bytes long\n", bitplane_count * DEFAULT_TILE_SIZE * horizontal_tiles * vertical_tiles);
 
-  fprintf(stdout, "TILES:");
+  if(!binary)
+    fprintf(output, "TILES:");
+
   for(size_t i = 0; i < vertical_tiles; i++)
   {
     //Read rows
@@ -212,11 +227,11 @@ void convert_to_tiles(png_structp png_ptr, png_infop info_ptr, int bitplane_coun
 
     //For each horizontal tile
     for(size_t j = 0; j < horizontal_tiles; j++)
-      convert_tile(row_pointers, j, bitplane_count, bit_depth);
+      convert_tile(row_pointers, j, bitplane_count, bit_depth, output);
   }
 }
 
-void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth)
+void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int bit_depth, FILE* output)
 {
   uint8_t** rows = (uint8_t**)malloc(DEFAULT_TILE_SIZE * sizeof(uint8_t*));
 
@@ -228,9 +243,17 @@ void convert_tile(png_bytep* row_pointers, int column, int bitplane_count, int b
   {
     for(size_t j = 0; j < DEFAULT_TILE_SIZE; j++)
     {
-        //Output two bitplanes for each
-        output_byte_text(rows[j][i]);
-        output_byte_text(rows[j][i+1]);
+        if(!binary)
+        {
+          //Output two bitplanes for each
+          output_byte_text(rows[j][i], output);
+          output_byte_text(rows[j][i+1], output);
+        }
+        else
+        {
+          putc(rows[j][i], output);
+          putc(rows[j][i+1], output);
+        }
     }
   }
 }
@@ -266,17 +289,17 @@ uint8_t* convert_to_bitplanes(png_bytep row_pointer, int col, int bitplane_count
   return bitplanes;
 }
 
-void output_byte_text(uint8_t byte)
+void output_byte_text(uint8_t byte, FILE* output)
 {
   static int output_bytes = 0;
 
   if((output_bytes % 16) == 0)
-    fprintf(stdout, "\n\t.db ");
+    fprintf(output, "\n\t.db ");
 
-  fprintf(stdout, "$%02X", byte);
+  fprintf(output, "$%02X", byte);
 
   if((output_bytes % 16) < 15)
-    fprintf(stdout, ",  ");
+    fprintf(output, ",  ");
 
   output_bytes++;
 }
