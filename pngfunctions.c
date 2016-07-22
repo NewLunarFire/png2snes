@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <stdlib.h>
 #include <png.h>
 
 #include "pngfunctions.h"
@@ -73,4 +75,43 @@ int detect_palette(png_structp png_ptr, png_infop info_ptr)
   }
 
   return 1;
+}
+
+uint8_t* read_png(png_structp png_ptr, png_infop info_ptr)
+{
+  //Get number of rows
+  unsigned int height = png_get_image_height(png_ptr, info_ptr);
+  unsigned int width = png_get_image_width(png_ptr, info_ptr);
+  unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+
+  //Get number of bytes per row
+  size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+
+  //Allocate memory
+  png_bytep data = (png_bytep)malloc(sizeof(png_byte) * rowbytes * height);
+  png_bytep* row_pointers = (png_bytep*)malloc(sizeof(png_bytep) * height);
+  for(int i = 0; i < height; i++)
+    row_pointers[i] =  &(data[i*rowbytes]);
+
+  uint8_t* pixels = (uint8_t*)malloc(width * height * sizeof(uint8_t));
+
+  //Read image
+  png_read_image(png_ptr, row_pointers);
+
+  uint and_mask = 0xFF >> (8 - bit_depth);
+  uint z;
+
+  //printf("\nbd= %u, am=%02X, m = %u\n", bit_depth, and_mask, mult);
+
+  for(size_t y = 0; y < height; y++)
+  {
+    z = 0;
+    for(size_t x = 0; x < width; x++, z += bit_depth)
+    {
+      uint right_shift = 8 - bit_depth - (z & 0x07);
+      pixels[(y*width)+x] = (row_pointers[y][z >> 3] >> right_shift) & and_mask;
+    }
+  }
+
+  return pixels;
 }

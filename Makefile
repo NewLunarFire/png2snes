@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Werror -pedantic -g
 LDFLAGS=-lpng -lz
 HEADERS=pngfunctions.h
-SRC=main.c pngfunctions.c argparser.c
+SRC=main.c pngfunctions.c argparser.c palette.c tile.c
 TARGET=png2snes
 
 all: $(SRC) $(HEADERS)
