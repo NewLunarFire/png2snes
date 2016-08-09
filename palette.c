@@ -16,7 +16,10 @@ uint16_t* convert_palette(png_structp png_ptr, png_infop info_ptr, int* size)
   //Allocate memory for palette
   palette = (uint16_t*)malloc(*size * sizeof(uint16_t));
   for(size_t i = 0; i < *size; i++)
+  {
     palette[i] = CONVERT_TO_BGR15(png_palette[i].red, png_palette[i].green, png_palette[i].blue);
+    printf("%lu: %04x: red: %d, green: %d, blue: %d\n", i, palette[i], png_palette[i].red, png_palette[i].green, png_palette[i].blue);
+  }
 
   for(size_t i = 1; i < *size; i++)
   {

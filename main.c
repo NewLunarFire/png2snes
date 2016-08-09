@@ -3,9 +3,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "argparser.h"
 #include "palette.h"
 #include "pngfunctions.h"
-#include "argparser.h"
+#include "tile.h"
 
 #define DEFAULT_TILE_SIZE 8
 
@@ -88,6 +89,8 @@ void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments ar
     output_palette_binary(args.output_file, palette, palette_size);
   else
     output_palette_wla(args.output_file, palette, palette_size);
+
+    free(palette);
 }
 
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args)
@@ -144,7 +147,21 @@ void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments arg
   }
 
   uint8_t* pixels = read_png(png_ptr, info_ptr);
-  convert_to_tiles(pixels, width, height, bitplane_count, tilesize, &data_size);
+  uint8_t* data;
 
-  fprintf(stderr, "VRAM section is %u bytes long\n", bitplane_count * DEFAULT_TILE_SIZE * horizontal_tiles * vertical_tiles);
+  if(tilesize == 8)
+    data = convert_to_tiles_8_8(pixels, width, height, bitplane_count, &data_size);
+  else if(tilesize == 16)
+    data = convert_to_tiles_16_16(pixels, width, height, bitplane_count, &data_size);
+
+  if(args.verbose)
+    fprintf(stderr, "VRAM section is %u bytes long\n", data_size);
+
+  if(args.binary)
+    output_tiles_binary(args.output_file, data, data_size);
+  else
+    output_tiles_wla(args.output_file, data, data_size);
+
+  free(pixels);
+  free(data);
 }
