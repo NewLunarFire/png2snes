@@ -1,9 +1,11 @@
+#include <png.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-uint8_t* convert_to_bitplanes(uint8_t* tile, int bitplane_count);
+#define SUBTILE_SIZE 16
+#define TILE_SIZE 64
 
 void output_tiles_binary(char* basename, uint8_t* data, int bytes)
 {
@@ -40,11 +42,7 @@ void output_tiles_wla(char* basename, uint8_t* data, int bytes)
     fp = fopen(filename, "w");
   }
 
-  if(!fp)
-  {
-    fprintf(stderr, "Could not open %s\n to write VRAM data", filename);
-  }
-  else
+  if(fp)
   {
     for(size_t i = 0; i < bytes; i++)
     {
@@ -59,150 +57,186 @@ void output_tiles_wla(char* basename, uint8_t* data, int bytes)
 
     fprintf(fp, "\n");
   }
+  else
+    fprintf(stderr, "Could not open %s\n to write VRAM data", filename);
 
   if(fp != stdout && fp != NULL)
     fclose(fp);
 }
 
-uint8_t* get_tile(uint8_t* pixels, uint width, uint height, uint x, uint y)
+uint8_t* get_tile_from_png(uint8_t* destination, png_structp png_ptr, png_bytepp row_pointers, int x, int y)
 {
-  static uint8_t tile[64];
+  unsigned int row = y * 8;
 
-  for(size_t k = 0; k < 8; k++)
-  {
-      uint row = (y * 8) + k;
-      memcpy(tile + (k*8), pixels + (row*width) + (x * 8), sizeof(uint8_t) * 8);
-  }
+  for(size_t k = 0; k < 8; k++, row++)
+      memcpy(destination + (k*8), row_pointers[row] + (x*8), 8);
 
-  return tile;
+  return destination;
 }
 
-uint8_t* convert_to_tiles_16_16(uint8_t* pixels, uint width, uint height, uint bitplane_count, uint* data_size)
+void convert_to_bitplanes(uint8_t* destination, const uint8_t* source, int bitplane_count)
 {
-  //Keep tracks of outputed bytes
-  uint horizontal_tiles  = width / 16;
-  uint vertical_tiles = height / 16;
-  uint tile_count = horizontal_tiles * vertical_tiles;
-  uint bytes_per_tile = 8 * bitplane_count;
+  uint8_t color;
 
-  uint position;
-  uint8_t *tile, *bitplanes;
+  memset(destination, 0, bitplane_count * 8);
 
-  //Optimize this calculation. It shouldn't be that complex
-  *data_size = ((((tile_count/8) + 1) * 8) + tile_count) * 16 * bitplane_count;
-  uint8_t* data = (uint8_t*)malloc(*data_size * sizeof(uint8_t));
-
-  //For each tile row
-  for(size_t i = 0, k = 0; i < vertical_tiles; i++)
+  //For each row
+  for(size_t row = 0, offset = 0; row < 8; row++, offset+=2)
   {
-    //For each tile
-    for(size_t j = 0; j < horizontal_tiles; j++, k++)
+    //For each column
+    for(size_t bit = 7; bit < 8; bit--)
     {
-      uint blerg = (k & 0x07) << 4;
-
-      position = blerg * bytes_per_tile;
-      tile = get_tile(pixels, width, height, 2*j, 2*i);
-      bitplanes = convert_to_bitplanes(tile, bitplane_count);
-      memcpy(data + position, bitplanes, bytes_per_tile);
-
-      position = (blerg+1) * bytes_per_tile;
-      tile = get_tile(pixels, width, height, (2*j) + 1, 2*i);
-      bitplanes = convert_to_bitplanes(tile, bitplane_count);
-      memcpy(data + position, bitplanes, bytes_per_tile);
-
-      position = (blerg+16) * bytes_per_tile;
-      tile = get_tile(pixels, width, height, 2*j, (2*i) + 1);
-      bitplanes = convert_to_bitplanes(tile, bitplane_count);
-      memcpy(data + position, bitplanes, bytes_per_tile);
-
-      position = (blerg+17) * bytes_per_tile;
-      tile = get_tile(pixels, width, height, (2*j) + 1, (2*i) + 1);
-      bitplanes = convert_to_bitplanes(tile, bitplane_count);
-      memcpy(data + position, bitplanes, bytes_per_tile);
-    }
-  }
-
-  return data;
-}
-
-uint8_t* convert_to_tiles_8_8(uint8_t* pixels, uint width, uint height, uint bitplane_count, uint* data_size)
-{
-  //Keep tracks of outputed bytes
-  uint horizontal_tiles  = width / 8;
-  uint vertical_tiles = height / 8;
-  uint bytes_per_tile = 8 * bitplane_count;
-
-  uint position;
-  uint8_t *tile, *bitplanes;
-
-  *data_size = horizontal_tiles * vertical_tiles * 8 * bitplane_count;
-
-  uint8_t* data = (uint8_t*)malloc(*data_size * sizeof(uint8_t));
-
-  //For each tile row
-  for(size_t i = 0, k = 0; i < vertical_tiles; i++)
-  {
-    //For each tile
-    for(size_t j = 0; j < horizontal_tiles; j++, k++)
-    {
-      tile = get_tile(pixels, width, height, j, i);
-      bitplanes = convert_to_bitplanes(tile, bitplane_count);
-      position = ((i * horizontal_tiles) + j) * bytes_per_tile;
-
-      memcpy(data + position, tile, bytes_per_tile);
-    }
-  }
-
-  return data;
-}
-
-uint8_t* convert_to_bitplanes(uint8_t* tile, int bitplane_count)
-{
-  uint subtile_size = 16;
-  uint datasize = bitplane_count * 8;
-
-  uint8_t* bitplanes = (uint8_t*)malloc(sizeof(uint8_t) * datasize);
-  memset(bitplanes, 0, sizeof(uint8_t) * datasize);
-
-  for(size_t row = 0; row < 8; row++)
-  {
-    for(size_t col = 0; col < 8; col++)
-    {
-      //Calculate number of bits to shift right
-      uint bit = 7 - col;
-
       //Get color number
-      uint8_t color = tile[(row*8) + col];
-      uint offset = (row * 2) + (subtile_size * (bitplane_count / 2));
+      color = source[(row*8) + 7 - bit];
 
       switch(bitplane_count)
       {
         case 8:
-          offset -= subtile_size;
-          bitplanes[offset] |= ((color & 0x40) >> 6) << bit;
-          bitplanes[offset+1] |= ((color & 0x80) >> 7) << bit;
-
-          offset -= subtile_size;
-          bitplanes[offset] |= ((color & 0x10) >> 4) << bit;
-          bitplanes[offset+1] |= ((color & 0x20) >> 5) << bit;
+          destination[offset+(SUBTILE_SIZE*3)+1] |= ((color & 0x80) >> 7) << bit;
+          destination[offset+(SUBTILE_SIZE*3)] |= ((color & 0x40) >> 6) << bit;
+          destination[offset+(SUBTILE_SIZE*2)+1] |= ((color & 0x20) >> 5) << bit;
+          destination[offset+(SUBTILE_SIZE*2)] |= ((color & 0x10) >> 4) << bit;
         case 4:
-          offset -= subtile_size;
-          bitplanes[offset] |= ((color & 0x04) >> 2) << bit;
-          bitplanes[offset+1] |= ((color & 0x08) >> 3) << bit;
+          destination[offset+SUBTILE_SIZE+1] |= ((color & 0x08) >> 3) << bit;
+          destination[offset+SUBTILE_SIZE] |= ((color & 0x04) >> 2) << bit;
         case 2:
-          offset -= subtile_size;
-          bitplanes[offset+1] |= (color & 0x01) << bit;
-          bitplanes[offset] |= ((color & 0x02) >> 1) << bit;
+          destination[offset+1] |= ((color & 0x02) >> 1) << bit;
+          destination[offset] |= (color & 0x01) << bit;
       }
+    }
+  }
+}
 
-      //Store on bitplanes
-      //for(size_t k = 0; k < bitplane_count; k++)
-      //{
-        //uint offset = (row*2) + ((k/2) * subtile_size) + (k & 0x01);
-        //bitplanes[offset] |= (((color & (1 << k))) >> k) << bit;
-      //}
+uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, uint* data_size)
+{
+  //Keep tracks of outputed bytes
+  //Get image size and bit depth
+  unsigned int height = png_get_image_height(png_ptr, info_ptr);
+  unsigned int width = png_get_image_width(png_ptr, info_ptr);
+  unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+  unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+
+  unsigned int horizontal_tiles  = width / 16;
+  unsigned int vertical_tiles = height / 16;
+  unsigned int tile_count = horizontal_tiles * vertical_tiles;
+  unsigned int bytes_per_tile = 8 * bitplane_count;
+
+  unsigned int tile_number;
+  uint8_t tile[TILE_SIZE];
+  uint8_t* data;
+
+  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  for(size_t i = 0; i < height; i++)
+    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+
+  png_read_image(png_ptr, row_pointers);
+
+  //Optimize this calculation. It shouldn't be that complex
+  *data_size = ((((tile_count/8) + 1) * 8) + tile_count) * 16 * bitplane_count;
+
+  //Allocate required space
+  data = (uint8_t*)malloc(*data_size);
+
+  //For each tile row
+  for(size_t i = 0, k = 0; i < vertical_tiles; i++)
+  {
+    //For each tile
+    for(size_t j = 0; j < horizontal_tiles; j++, k++)
+    {
+      //Tile
+      tile_number = (k & 0x07) << 4;
+      get_tile_from_png(tile, png_ptr, row_pointers, 2*j, 2*i);
+      convert_to_bitplanes(data + (tile_number++ * bytes_per_tile), tile, bitplane_count);
+
+      //Tile + 1
+      get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, 2*i);
+      convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
+
+      //Tile + 16
+      tile_number += 15;
+      get_tile_from_png(tile, png_ptr, row_pointers, 2*j, (2*i) + 1);
+      convert_to_bitplanes(data + (tile_number++ * bytes_per_tile), tile, bitplane_count);
+
+      //Tile + 17
+      get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, (2*i) + 1);
+      convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
     }
   }
 
-  return bitplanes;
+  return data;
+}
+
+uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, uint* data_size)
+{
+  //Keep tracks of outputed bytes
+  unsigned int height = png_get_image_height(png_ptr, info_ptr);
+  unsigned int width = png_get_image_width(png_ptr, info_ptr);
+  unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+  unsigned int horizontal_tiles  = width / 8;
+  unsigned int vertical_tiles = height / 8;
+  unsigned int bytes_per_tile = 8 * bitplane_count;
+
+  unsigned int position;
+  uint8_t *tile, *data;
+
+  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  for(size_t i = 0; i < height; i++)
+    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+
+  png_read_image(png_ptr, row_pointers);
+
+  *data_size = horizontal_tiles * vertical_tiles * 8 * bitplane_count;
+  data = (uint8_t*)malloc(*data_size);
+
+  //For each tile row
+  for(size_t i = 0, k = 0; i < vertical_tiles; i++)
+  {
+    //For each tile
+    for(size_t j = 0; j < horizontal_tiles; j++, k++)
+    {
+      get_tile_from_png(tile, png_ptr, row_pointers, j, i);
+      convert_to_bitplanes(data + (k * bytes_per_tile), tile, bitplane_count);
+    }
+  }
+
+  return data;
+}
+
+uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, unsigned int tilesize, uint* data_size)
+{
+  //Keep tracks of outputed bytes
+  //Get image size and bit depth
+  unsigned int height = png_get_image_height(png_ptr, info_ptr);
+  unsigned int width = png_get_image_width(png_ptr, info_ptr);
+  unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+  unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+
+  unsigned int horizontal_tiles  = width / tilesize;
+  unsigned int vertical_tiles = height / tilesize;
+  unsigned int tile_count = horizontal_tiles * vertical_tiles;
+  unsigned int bytes_per_tile = 8 * bitplane_count;
+
+  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  for(size_t i = 0; i < height; i++)
+    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+
+  png_read_image(png_ptr, row_pointers);
+
+  //For each tile row
+  for(size_t i = 0, k = 0; i < vertical_tiles; i++)
+  {
+    //For each tile
+    for(size_t j = 0; j < horizontal_tiles; j++, k++)
+    {
+      //Convert single tile
+    }
+  }
+  if(tilesize == 8)
+  {
+    return convert_to_tiles_8_8(png_ptr, info_ptr, bitplane_count, data_size);
+  }
+  else// if(tilesize == 16)
+  {
+    return convert_to_tiles_16_16(png_ptr, info_ptr, bitplane_count, data_size);
+  }
 }
