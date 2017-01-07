@@ -12,7 +12,7 @@
 
 void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
-uint8_t* convert_to_tiles(uint8_t* data, uint width, uint height, uint bitplane_count, uint tilesize, uint* data_size);
+uint8_t* convert_to_tiles(uint8_t* data, unsigned int width, unsigned int height, unsigned int bitplane_count, unsigned int tilesize, unsigned int* data_size);
 
 int main(int argc, char *argv[])
 {

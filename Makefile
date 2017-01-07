@@ -1,15 +1,15 @@
 CC=gcc
 CFLAGS=-std=c99 -Werror -pedantic -g
 LDFLAGS=-lpng -lz
-HEADERS=pngfunctions.h
-SRC=main.c pngfunctions.c argparser.c palette.c tile.c
+HEADERS=argparser.h palette.h pngfunctions.h tile.h
+SRC=argparser.c palette.c pngfunctions.c tile.c
 TARGET=png2snes
 
-all: $(SRC) $(HEADERS)
-	$(CC) $(CFLAGS) $(SRC) $(LDFLAGS) -o $(TARGET)
+all: main.c main.h $(SRC) $(HEADERS)
+	$(CC) $(CFLAGS) $(SRC) main.c $(LDFLAGS) -o $(TARGET)
 
-test: tests.c
-	$(CC) $< -o $@
+test: tests.c $(SRC) $(HEADERS)
+	$(CC) $(CFLAGS) $(SRC) tests.c $(LDFLAGS) -o $@
 
 clean:
 	rm *.asm *.cgr *.vra

@@ -8,9 +8,9 @@
 
 void expand_to_byte(png_structp png_ptr, png_row_infop row_info, png_bytep data)
 {
-  uint pixels_per_byte = 8 / row_info->bit_depth;
-  uint mask = 0xFF >> (8 - row_info->bit_depth);
-  uint offset = row_info->width - 1;
+  unsigned int pixels_per_byte = 8 / row_info->bit_depth;
+  unsigned int mask = 0xFF >> (8 - row_info->bit_depth);
+  unsigned int offset = row_info->width - 1;
 
   for(size_t i = row_info->rowbytes - 1; i < row_info->rowbytes; i--, offset-=pixels_per_byte)
   {

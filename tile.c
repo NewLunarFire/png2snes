@@ -4,8 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SUBTILE_SIZE 16
-#define TILE_SIZE 64
+#include "tile.h"
 
 void output_tiles_binary(char* basename, uint8_t* data, int bytes)
 {
@@ -107,7 +106,7 @@ void convert_to_bitplanes(uint8_t* destination, const uint8_t* source, int bitpl
   }
 }
 
-uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, uint* data_size)
+uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, unsigned int* data_size)
 {
   //Keep tracks of outputed bytes
   //Get image size and bit depth
@@ -166,7 +165,7 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
   return data;
 }
 
-uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, uint* data_size)
+uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, unsigned int* data_size)
 {
   //Keep tracks of outputed bytes
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
@@ -202,8 +201,10 @@ uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned 
   return data;
 }
 
-uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, unsigned int tilesize, uint* data_size)
+uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bitplane_count, unsigned int tilesize, unsigned int* data_size)
 {
+  /*
+
   //Keep tracks of outputed bytes
   //Get image size and bit depth
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
@@ -215,6 +216,7 @@ uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bit
   unsigned int vertical_tiles = height / tilesize;
   unsigned int tile_count = horizontal_tiles * vertical_tiles;
   unsigned int bytes_per_tile = 8 * bitplane_count;
+
 
   png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
   for(size_t i = 0; i < height; i++)
@@ -231,6 +233,8 @@ uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bit
       //Convert single tile
     }
   }
+  */
+
   if(tilesize == 8)
   {
     return convert_to_tiles_8_8(png_ptr, info_ptr, bitplane_count, data_size);
