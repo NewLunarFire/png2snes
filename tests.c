@@ -19,6 +19,7 @@ int testConvert0sto2Bitplanes();
 int testConvert3sto2Bitplanes();
 int testConvertTo2Bitplanes();
 
+
 struct unit_test_t {
   char* name;
   int (*testFunction)();

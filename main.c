@@ -88,7 +88,7 @@ void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments arg
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
   unsigned int width = png_get_image_width(png_ptr, info_ptr);
   unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
-  unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+  //unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
 
   //Print tilesize
   if(args.tilesize == 0)

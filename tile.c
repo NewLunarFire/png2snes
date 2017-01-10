@@ -60,6 +60,28 @@ void output_tiles_wla(char* basename, uint8_t* data, int bytes)
     fclose(fp);
 }
 
+void print_tile(uint8_t* tile) {
+  size_t i, j;
+  for(i = 0; i < 8; i++) {
+    for(j = 0; j < 8; j++) {
+      printf("%d", tile[(i*8) + j]);
+    }
+
+    printf("\n");
+  }
+
+  printf("\n");
+}
+
+void print_bitplanes(uint8_t* bitplanes) {
+    size_t i = 0;
+    for(i = 0; i < (SUBTILE_SIZE - 1); i++) {
+      printf("%02X, ", bitplanes[i]);
+    }
+
+    printf("%02X\n", bitplanes[SUBTILE_SIZE - 1]);
+}
+
 uint8_t* get_tile_from_png(uint8_t* destination, png_structp png_ptr, png_bytepp row_pointers, int x, int y)
 {
   unsigned int row = y * 8;
@@ -109,7 +131,7 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
   //Get image size and bit depth
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
   unsigned int width = png_get_image_width(png_ptr, info_ptr);
-  unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+  //unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
   unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
 
   unsigned int horizontal_tiles  = width / 16;
@@ -140,24 +162,40 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
     for(size_t j = 0; j < horizontal_tiles; j++, k++)
     {
       //Tile
-      tile_number = (k & 0x07) << 4;
+      tile_number = ((k & 0x07) << 1) | ((k & ~(0x07)) << 2);
       get_tile_from_png(tile, png_ptr, row_pointers, 2*j, 2*i);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
+
+      //print_tile(tile);
+      //print_bitplanes(data + (tile_number * bytes_per_tile));
+      printf("Tile Number = %u\nOffset = %u\n", tile_number, tile_number * bytes_per_tile);
 
       //Tile + 1
       tile_number += 1;
       get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, 2*i);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
 
+      //print_tile(tile);
+      //print_bitplanes(data + (tile_number * bytes_per_tile));
+      printf("Tile Number = %u\nOffset = %u\n", tile_number, tile_number * bytes_per_tile);
+
       //Tile + 16
       tile_number += 15;
       get_tile_from_png(tile, png_ptr, row_pointers, 2*j, (2*i) + 1);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
 
+      //print_tile(tile);
+      //print_bitplanes(data + (tile_number * bytes_per_tile));
+      printf("Tile Number = %u\nOffset = %u\n", tile_number, tile_number * bytes_per_tile);
+
       //Tile + 17
       tile_number += 1;
       get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, (2*i) + 1);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
+
+      //print_tile(tile);
+      //print_bitplanes(data + (tile_number * bytes_per_tile));
+      printf("Tile Number = %u\nOffset = %u\n", tile_number, tile_number * bytes_per_tile);
     }
   }
 
@@ -174,7 +212,7 @@ uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned 
   unsigned int vertical_tiles = height / 8;
   unsigned int bytes_per_tile = 8 * bitplane_count;
 
-  unsigned int position;
+  //unsigned int position;
   uint8_t *tile, *data;
 
   png_bytepp row_pointers = malloc(sizeof(png_bytep) * height);
