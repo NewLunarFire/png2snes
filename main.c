@@ -12,37 +12,17 @@
 
 void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
-uint8_t* convert_to_tiles(uint8_t* data, uint width, uint height, uint bitplane_count, uint tilesize, uint* data_size);
-
-static inline int close_file_exit(FILE* fp, int exit_code)
-{
-  fclose(fp);
-  exit(exit_code);
-}
-
-static inline int close_file_and_png_exit(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info, int exit_code)
-{
-  png_destroy_read_struct(png_ptr, info_ptr, end_info);
-  close_file_exit(fp, exit_code);
-}
-
-FILE* open_file(const char* basename, const char* extension, const char* mode)
-{
-  char* filename = (char*)malloc((strlen(basename) + 5) * sizeof(char));
-  strcpy(filename, basename);
-  strcat(filename, ".");
-  strcat(filename, extension);
-  return fopen(filename, mode);
-}
+uint8_t* convert_to_tiles(uint8_t* data, unsigned int width, unsigned int height, unsigned int bitplane_count, unsigned int tilesize, unsigned int* data_size);
 
 int main(int argc, char *argv[])
 {
+  int exit_code = -2;
+
   //Lib PNG Structures
   png_structp png_ptr;
   png_infop info_ptr, end_info;
 
   FILE* input = NULL; //File containing png image
-  FILE* output = NULL; //Output file
 
   //Parse command-line arguments
   struct arguments args = parse_arguments(argc, argv);
@@ -57,20 +37,27 @@ int main(int argc, char *argv[])
 
   //If file is not a PNG, quit
   if (!detect_png(input))
-    return close_file_exit(input, -2);
+    goto close_file;
 
   //If initializing libpng failed, quit
   if(!initialize_libpng(input, &png_ptr, &info_ptr, &end_info))
-    return close_file_exit(input, -3);
+    goto close_file;
 
   //If the PNG file does not contain a palette, exit
   if(!detect_palette(png_ptr, info_ptr))
-    return close_file_and_png_exit(input, &png_ptr, &info_ptr, &end_info, -4);
+    goto clean_png_struct;
 
   generate_cgram(png_ptr, info_ptr, args);
   generate_vram(png_ptr, info_ptr, args);
 
-  return close_file_and_png_exit(input, &png_ptr, &info_ptr, &end_info, 0);
+  exit_code++;
+clean_png_struct:
+  png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
+  exit_code++;
+close_file:
+  fclose(input);
+
+  return exit_code;
 }
 
 void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args)
@@ -101,6 +88,7 @@ void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments arg
   unsigned int height = png_get_image_height(png_ptr, info_ptr);
   unsigned int width = png_get_image_width(png_ptr, info_ptr);
   unsigned int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+  //unsigned int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
 
   //Print tilesize
   if(args.tilesize == 0)
@@ -134,25 +122,15 @@ void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments arg
       fprintf(stderr, "Assuming %u bitplanes\n", bitplane_count);
   }
 
-  //Get number of horizontal and vertical tiles to process
-  unsigned int horizontal_tiles = width / tilesize;
-  unsigned int vertical_tiles = height / tilesize;
-
   //Print information on the image
   if(args.verbose)
   {
-    fprintf(stderr, "Image size is %ux%u, bit depth is %u\n", width, height, bit_depth);
-    fprintf(stderr, "Tile count: %u (%ux%u)\n", horizontal_tiles * vertical_tiles, horizontal_tiles, vertical_tiles);
+    fprintf(stderr, "Image size is %ux%u, bit depth is %u\n", width / tilesize, height / tilesize, bit_depth);
+    fprintf(stderr, "Tile count: %u (%ux%u)\n", (width / tilesize) * (height / tilesize), width / tilesize, height / tilesize);
     fprintf(stderr, "Outputting on %u bitplanes\n", bitplane_count);
   }
 
-  uint8_t* pixels = read_png(png_ptr, info_ptr);
-  uint8_t* data;
-
-  if(tilesize == 8)
-    data = convert_to_tiles_8_8(pixels, width, height, bitplane_count, &data_size);
-  else if(tilesize == 16)
-    data = convert_to_tiles_16_16(pixels, width, height, bitplane_count, &data_size);
+  uint8_t* data = convert_tiles(png_ptr, info_ptr, bitplane_count, tilesize, &data_size);
 
   if(args.verbose)
     fprintf(stderr, "VRAM section is %u bytes long\n", data_size);
@@ -162,6 +140,5 @@ void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments arg
   else
     output_tiles_wla(args.output_file, data, data_size);
 
-  free(pixels);
   free(data);
 }

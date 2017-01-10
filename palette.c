@@ -1,4 +1,5 @@
 #include <png.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "palette.h"
@@ -14,7 +15,7 @@ uint16_t* convert_palette(png_structp png_ptr, png_infop info_ptr, int* size)
   png_get_PLTE(png_ptr, info_ptr, &png_palette, size);
 
   //Allocate memory for palette
-  palette = (uint16_t*)malloc(*size * sizeof(uint16_t));
+  palette = malloc(*size * sizeof(uint16_t));
   for(size_t i = 0; i < *size; i++)
     palette[i] = CONVERT_TO_BGR15(png_palette[i].red, png_palette[i].green, png_palette[i].blue);
 
@@ -33,12 +34,11 @@ uint16_t* convert_palette(png_structp png_ptr, png_infop info_ptr, int* size)
 void output_palette_binary(char* basename, uint16_t* data, int words)
 {
   FILE* fp;
+  char* filename;
 
-  char* filename = (char*)malloc((strlen(basename) + 5) * sizeof(char));
-  strcpy(filename, basename);
-  strcat(filename, ".cgr");
-
+  asprintf(&filename, "%s.cgr", basename);
   fp = fopen(filename, "wb");
+
   if(!fp)
   {
     fprintf(stderr, "Could not open %s\n to write CGRAM data", filename);
@@ -62,9 +62,7 @@ void output_palette_wla(char* basename, uint16_t* data, int words)
     fp = stdout;
   else
   {
-    char* filename = (char*)malloc((strlen(basename) + 11) * sizeof(char));
-    strcpy(filename, basename);
-    strcat(filename, "_cgram.asm");
+    asprintf(&filename, "%s_cgram.asm", basename);
     fp = fopen(filename, "w");
   }
 
