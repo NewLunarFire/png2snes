@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 //#include "argparser.h"
 //#include "main.h"
@@ -10,9 +11,13 @@
 #include "tile.h"
 
 uint8_t* get_tile_from_png(uint8_t* destination, png_structp png_ptr, png_bytepp row_pointers, int x, int y);
+void convert_to_bitplanes(uint8_t* destination, const uint8_t* source, int bitplane_count);
 
 //Tests
 int testGetTileFromPNG();
+int testConvert0sto2Bitplanes();
+int testConvert3sto2Bitplanes();
+int testConvertTo2Bitplanes();
 
 struct unit_test_t {
   char* name;
@@ -20,7 +25,10 @@ struct unit_test_t {
 };
 
 struct unit_test_t unitTests[] = {
-  {"get_tile_from_png", testGetTileFromPNG},
+  {"Get Tile from PNG", testGetTileFromPNG},
+  {"Convert 0s to 2 bitplanes", testConvert0sto2Bitplanes},
+  {"Convert 3s to 2 bitplanes", testConvert3sto2Bitplanes},
+  {"Convert Array to 2 bitplanes", testConvertTo2Bitplanes},
   {NULL, NULL}
 };
 
@@ -111,7 +119,7 @@ int testGetTileFromPNG() {
 
       for(k = 0; k < TILE_SIZE; k++) {
         if(tile[k] != v) {
-          printf("Expected %lu got %lu\n", v, tile[k]);
+          printf("Expected %u got %u\n", v, tile[k]);
           row = col = 2;
           k = TILE_SIZE;
           exit_code = 1;
@@ -124,4 +132,83 @@ int testGetTileFromPNG() {
   png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
   fclose(input);
   return exit_code;
+}
+
+int testConvert0sto2Bitplanes() {
+  uint8_t data[64];
+  uint8_t bitplanes[16];
+  size_t i;
+  int exit_code = 0;
+
+  memset(data, 0, 64);
+
+  convert_to_bitplanes(bitplanes, data, 2);
+
+  for(i = 0; i < 16; i++) {
+    if(bitplanes[i] != 0) {
+      printf("Expected all zeroes, but got a %02X at %lu\n", bitplanes[i], i);
+      exit_code = 1;
+    }
+  }
+
+  return exit_code;
+}
+
+int testConvert3sto2Bitplanes() {
+  uint8_t data[64];
+  uint8_t bitplanes[16];
+  size_t i;
+  int exit_code = 0;
+
+  memset(data, 3, 64);
+
+  convert_to_bitplanes(bitplanes, data, 2);
+
+  for(i = 0; i < 16; i++) {
+    if(bitplanes[i] != 0xFF) {
+      printf("Expected all FFs, but got a %02X at %lu\n", bitplanes[i], i);
+      exit_code = 1;
+    }
+  }
+
+  return exit_code;
+}
+
+int testConvertTo2Bitplanes() {
+  uint8_t actualResult[16];
+  size_t i;
+
+  const uint8_t inputSequence[] = {0, 0, 0, 0, 0, 0, 0, 0,
+                                 0, 0, 0, 0, 0, 0, 0, 0,
+                                 1, 1, 1, 1, 1, 1, 1, 1,
+                                 1, 1, 1, 1, 1, 1, 1, 1,
+                                 2, 2, 2, 2, 2, 2, 2, 2,
+                                 2, 2, 2, 2, 2, 2, 2, 2,
+                                 3, 3, 3, 3, 3, 3, 3, 3,
+                                 3, 3, 3, 3, 3, 3, 3, 3};
+
+  const uint8_t expectedResult[] = {0x00, 0x00, 0x00, 0x00,
+                                    0xFF, 0x00, 0xFF, 0x00,
+                                    0x00, 0xFF, 0x00, 0xFF,
+                                    0xFF, 0xFF, 0xFF, 0xFF};
+
+
+  convert_to_bitplanes(actualResult, inputSequence, 2);
+  if(memcmp(actualResult, expectedResult, 16) != 0) {
+    printf("Expected and actual results do not match\n");
+
+    printf("Expected:");
+    for(i = 0; i < 15; i++)
+      printf("%02X, ", expectedResult[i]);
+    printf("%02X\n", expectedResult[15]);
+
+    printf("Actual:");
+    for(i = 0; i < 15; i++)
+      printf("%02X, ", actualResult[i]);
+    printf("%02X\n", actualResult[15]);
+
+    return 1;
+  }
+
+  return 0;
 }
