@@ -9,12 +9,11 @@
 void output_tiles_binary(char* basename, uint8_t* data, int bytes)
 {
   FILE* fp;
+  char* filename;
 
-  char* filename = (char*)malloc((strlen(basename) + 5) * sizeof(char));
-  strcpy(filename, basename);
-  strcat(filename, ".vra");
-
+  asprintf(&filename, "%s.vra", basename);
   fp = fopen(filename, "wb");
+
   if(!fp)
   {
     fprintf(stderr, "Could not open %s\n to write VRAM data", filename);
@@ -35,9 +34,7 @@ void output_tiles_wla(char* basename, uint8_t* data, int bytes)
     fp = stdout;
   else
   {
-    char* filename = (char*)malloc((strlen(basename) + 11) * sizeof(char));
-    strcpy(filename, basename);
-    strcat(filename, "_vram.asm");
+    asprintf(&filename, "%s_vram.asm", basename);
     fp = fopen(filename, "w");
   }
 
@@ -124,9 +121,9 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
   uint8_t tile[TILE_SIZE];
   uint8_t* data;
 
-  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  png_bytepp row_pointers = malloc(sizeof(png_bytep) * height);
   for(size_t i = 0; i < height; i++)
-    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+    row_pointers[i] = malloc(sizeof(png_byte) * rowbytes);
 
   png_read_image(png_ptr, row_pointers);
 
@@ -134,7 +131,7 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
   *data_size = ((((tile_count/8) + 1) * 8) + tile_count) * 16 * bitplane_count;
 
   //Allocate required space
-  data = (uint8_t*)malloc(*data_size);
+  data = malloc(*data_size);
 
   //For each tile row
   for(size_t i = 0, k = 0; i < vertical_tiles; i++)
@@ -145,18 +142,20 @@ uint8_t* convert_to_tiles_16_16(png_structp png_ptr, png_infop info_ptr, unsigne
       //Tile
       tile_number = (k & 0x07) << 4;
       get_tile_from_png(tile, png_ptr, row_pointers, 2*j, 2*i);
-      convert_to_bitplanes(data + (tile_number++ * bytes_per_tile), tile, bitplane_count);
+      convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
 
       //Tile + 1
+      tile_number += 1;
       get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, 2*i);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
 
       //Tile + 16
       tile_number += 15;
       get_tile_from_png(tile, png_ptr, row_pointers, 2*j, (2*i) + 1);
-      convert_to_bitplanes(data + (tile_number++ * bytes_per_tile), tile, bitplane_count);
+      convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
 
       //Tile + 17
+      tile_number += 1;
       get_tile_from_png(tile, png_ptr, row_pointers, (2*j) + 1, (2*i) + 1);
       convert_to_bitplanes(data + (tile_number * bytes_per_tile), tile, bitplane_count);
     }
@@ -178,14 +177,15 @@ uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned 
   unsigned int position;
   uint8_t *tile, *data;
 
-  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  png_bytepp row_pointers = malloc(sizeof(png_bytep) * height);
   for(size_t i = 0; i < height; i++)
-    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+    row_pointers[i] = malloc(sizeof(png_byte) * rowbytes);
 
   png_read_image(png_ptr, row_pointers);
 
   *data_size = horizontal_tiles * vertical_tiles * 8 * bitplane_count;
-  data = (uint8_t*)malloc(*data_size);
+  data = malloc(*data_size);
+  tile = malloc(TILE_SIZE);
 
   //For each tile row
   for(size_t i = 0, k = 0; i < vertical_tiles; i++)
@@ -218,9 +218,9 @@ uint8_t* convert_tiles(png_structp png_ptr, png_infop info_ptr, unsigned int bit
   unsigned int bytes_per_tile = 8 * bitplane_count;
 
 
-  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  png_bytepp row_pointers = malloc(sizeof(png_bytep) * height);
   for(size_t i = 0; i < height; i++)
-    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * rowbytes);
+    row_pointers[i] = malloc(sizeof(png_byte) * rowbytes);
 
   png_read_image(png_ptr, row_pointers);
 

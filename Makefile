@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c99 -Werror -pedantic -g
+CFLAGS=-std=c99 -Wall -pedantic -g -D_GNU_SOURCE
 LDFLAGS=-lpng -lz
 HEADERS=argparser.h palette.h pngfunctions.h tile.h
 SRC=argparser.c palette.c pngfunctions.c tile.c

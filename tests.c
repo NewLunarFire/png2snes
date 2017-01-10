@@ -53,10 +53,10 @@ int main(int argc, char* argv[]) {
 
 png_bytepp get_row_pointers(png_structp png_ptr, unsigned int width, unsigned int height) {
   size_t i;
-  png_bytepp row_pointers = (png_bytepp)malloc(sizeof(png_bytep) * height);
+  png_bytepp row_pointers = malloc(sizeof(png_bytep) * height);
 
   for(i = 0; i < height; i++)
-    row_pointers[i] = (png_bytep)malloc(sizeof(png_byte) * width);
+    row_pointers[i] = malloc(sizeof(png_byte) * width);
 
   png_read_image(png_ptr, row_pointers);
   return row_pointers;
