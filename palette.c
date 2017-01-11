@@ -36,21 +36,29 @@ void output_palette_binary(char* basename, uint16_t* data, int words)
   FILE* fp;
   char* filename;
 
-  asprintf(&filename, "%s.cgr", basename);
+  if(asprintf(&filename, "%s.cgr", basename) == -1)
+  {
+    perror("output_palette_binary");
+    return;
+  }
+
   fp = fopen(filename, "wb");
 
   if(!fp)
   {
-    fprintf(stderr, "Could not open %s\n to write CGRAM data", filename);
+    perror(filename);
+    free(filename);
+    return;
   }
-  else
+
+  for(size_t i = 0; i < words; i++)
   {
-    for(size_t i = 0; i < words; i++)
-    {
-      putc(data[i] & 0xFF, fp);
-      putc(data[i] >> 8, fp);
-    }
+    putc(data[i] & 0xFF, fp);
+    putc(data[i] >> 8, fp);
   }
+
+  free(filename);
+  fclose(fp);
 }
 
 void output_palette_wla(char* basename, uint16_t* data, int words)
@@ -62,29 +70,36 @@ void output_palette_wla(char* basename, uint16_t* data, int words)
     fp = stdout;
   else
   {
-    asprintf(&filename, "%s_cgram.asm", basename);
-    fp = fopen(filename, "w");
-  }
-
-  if(!fp)
-  {
-    fprintf(stderr, "Could not open %s\n to write CGRAM data", filename);
-  }
-  else
-  {
-    for(size_t i = 0; i < words; i++)
+    if(asprintf(&filename, "%s_cgram.asm", basename) == -1)
     {
-      if((i & 0x07) == 0)
-        fprintf(fp, "\n\t.dw ");
-
-      fprintf(fp, "$%04X", data[i]);
-
-      if(((i & 0x07) < 7) && (i < (words-1)))
-          fprintf(fp, ", ");
+      perror("output_palette_wla");
+      return;
     }
 
-    fprintf(fp, "\n");
+    fp = fopen(filename, "w");
+
+    if(!fp)
+    {
+      perror(filename);
+      free(filename);
+      return;
+    }
+
+    free(filename);
   }
+
+  for(size_t i = 0; i < words; i++)
+  {
+    if((i & 0x07) == 0)
+      fprintf(fp, "\n\t.dw ");
+
+    fprintf(fp, "$%04X", data[i]);
+
+    if(((i & 0x07) < 7) && (i < (words-1)))
+        fprintf(fp, ", ");
+   }
+
+  fprintf(fp, "\n");
 
   if(fp != stdout && fp != NULL)
     fclose(fp);

@@ -8,21 +8,30 @@
 
 void output_tiles_binary(char* basename, uint8_t* data, int bytes)
 {
+
   FILE* fp;
   char* filename;
 
-  asprintf(&filename, "%s.vra", basename);
+  if(asprintf(&filename, "%s.vra", basename) == -1)
+  {
+    perror("output_tiles_binary");
+    return;
+  }
+
   fp = fopen(filename, "wb");
 
   if(!fp)
   {
-    fprintf(stderr, "Could not open %s\n to write VRAM data", filename);
+    perror(filename);
+    free(filename);
+    return;
   }
-  else
-  {
-    for(size_t i = 0; i < bytes; i++)
-      putc(data[i], fp);
-  }
+
+  for(size_t i = 0; i < bytes; i++)
+    putc(data[i], fp);
+
+  free(filename);
+  fclose(fp);
 }
 
 void output_tiles_wla(char* basename, uint8_t* data, int bytes)
@@ -34,27 +43,36 @@ void output_tiles_wla(char* basename, uint8_t* data, int bytes)
     fp = stdout;
   else
   {
-    asprintf(&filename, "%s_vram.asm", basename);
-    fp = fopen(filename, "w");
-  }
-
-  if(fp)
-  {
-    for(size_t i = 0; i < bytes; i++)
+    if(asprintf(&filename, "%s_vram.asm", basename) == -1)
     {
-      if((i & 0x0F) == 0)
-        fprintf(fp, "\n\t.db ");
-
-      fprintf(fp, "$%02X", data[i]);
-
-      if(((i & 0x0F) < 15) && (i < (bytes-1)))
-          fprintf(fp, ", ");
+      perror("output_tiles_wla");
+      return;
     }
 
-    fprintf(fp, "\n");
+    fp = fopen(filename, "w");
+
+    if(!fp)
+    {
+      perror(filename);
+      free(filename);
+      return;
+    }
+
+    free(filename);
   }
-  else
-    fprintf(stderr, "Could not open %s\n to write VRAM data", filename);
+
+  for(size_t i = 0; i < bytes; i++)
+  {
+    if((i & 0x0F) == 0)
+      fprintf(fp, "\n\t.db ");
+
+    fprintf(fp, "$%02X", data[i]);
+
+    if(((i & 0x0F) < 15) && (i < (bytes-1)))
+        fprintf(fp, ", ");
+  }
+
+  fprintf(fp, "\n");
 
   if(fp != stdout && fp != NULL)
     fclose(fp);
