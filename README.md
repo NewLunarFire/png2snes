@@ -21,6 +21,9 @@ Options:
 ## Compiling
 `make` and you're in business. The project depends only on libpng.
 
+## Example
+An Hello World example is provided in the example/Hello World folder. You need WLA-DX 9.6 installed. Again, `make` and you're in business.
+
 ## Why use PNG for making SNES graphics?
 There are multiple reasons for using PNG to create your SNES tiles and sprites before converting them to CGRAM and VRAM data:
 
