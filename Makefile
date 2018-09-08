@@ -12,4 +12,4 @@ test: tests.c $(SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(SRC) tests.c $(LDFLAGS) -o $@
 
 clean:
-	rm *.asm *.cgr *.vra
+	rm -f *.asm *.cgr *.vra
