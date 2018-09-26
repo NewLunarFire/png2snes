@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-std=c99 -Wall -pedantic -g -D_GNU_SOURCE
-LDFLAGS=-lpng -lz
+CFLAGS=-std=c99 -Wall -pedantic -g -D_GNU_SOURCE `libpng-config --cflags`
+LDFLAGS=`libpng-config --ldflags`
 HEADERS=argparser.h palette.h pngfunctions.h tile.h
 SRC=argparser.c palette.c pngfunctions.c tile.c
 TARGET=png2snes
@@ -12,4 +12,4 @@ test: tests.c $(SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(SRC) tests.c $(LDFLAGS) -o $@
 
 clean:
-	rm *.asm *.cgr *.vra
+	rm -f *.asm *.cgr *.vra

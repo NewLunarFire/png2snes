@@ -77,7 +77,7 @@ void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments ar
   else
     output_palette_wla(args.output_file, palette, palette_size);
 
-    free(palette);
+  free(palette);
 }
 
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args)

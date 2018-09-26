@@ -43,7 +43,7 @@ int detect_png(FILE* fp)
 int initialize_libpng(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_infop* end_info)
 {
   //Create the PNG Read Struct
-  *png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, png_voidp_NULL, NULL, NULL);
+  *png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
   if (!png_ptr)
   {
     fprintf(stderr, "Error creating libpng read struct\n");
@@ -55,7 +55,7 @@ int initialize_libpng(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_i
 
   if (!info_ptr)
   {
-    png_destroy_read_struct(png_ptr, png_infopp_NULL, png_infopp_NULL);
+    png_destroy_read_struct(png_ptr, NULL, NULL);
     fprintf(stderr, "Error creating first info struct\n");
     return 0;
   }
@@ -64,7 +64,7 @@ int initialize_libpng(FILE* fp, png_structp* png_ptr, png_infop* info_ptr, png_i
   *end_info = png_create_info_struct(*png_ptr);
   if (!end_info)
   {
-    png_destroy_read_struct(png_ptr, info_ptr, png_infopp_NULL);
+    png_destroy_read_struct(png_ptr, info_ptr, NULL);
     fprintf(stderr, "Error creating second info struct\n");
     return 0;
   }
