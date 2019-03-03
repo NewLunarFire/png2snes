@@ -11,7 +11,7 @@
 
 #define DEFAULT_TILE_SIZE 8
 
-void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
+int generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args);
 uint8_t* convert_to_tiles(uint8_t* data, unsigned int width, unsigned int height, unsigned int bitplane_count, unsigned int tilesize, unsigned int* data_size);
 
@@ -48,7 +48,9 @@ int main(int argc, char *argv[])
   if(!detect_palette(png_ptr, info_ptr))
     goto clean_png_struct;
 
-  generate_cgram(png_ptr, info_ptr, args);
+  if (generate_cgram(png_ptr, info_ptr, args) != 0)
+    goto clean_png_struct;
+
   generate_vram(png_ptr, info_ptr, args);
 
   exit_code++;
@@ -61,11 +63,14 @@ close_file:
   return exit_code;
 }
 
-void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args)
+int generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments args)
 {
   //Convert palette to the format used by the SNES
   int palette_size;
   uint16_t* palette = convert_palette(png_ptr, info_ptr, &palette_size, powl(2, args.bitplanes));
+
+  if (!palette)
+	  return -1;
 
   if(args.verbose)
   {
@@ -79,6 +84,8 @@ void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments ar
     output_palette_wla(args.output_file, palette, palette_size);
 
   free(palette);
+
+  return 0;
 }
 
 void generate_vram(png_structp png_ptr, png_infop info_ptr, struct arguments args)
