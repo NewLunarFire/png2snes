@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "argparser.h"
 #include "palette.h"
@@ -64,7 +65,7 @@ void generate_cgram(png_structp png_ptr, png_infop info_ptr, struct arguments ar
 {
   //Convert palette to the format used by the SNES
   int palette_size;
-  uint16_t* palette = convert_palette(png_ptr, info_ptr, &palette_size);
+  uint16_t* palette = convert_palette(png_ptr, info_ptr, &palette_size, powl(2, args.bitplanes));
 
   if(args.verbose)
   {
