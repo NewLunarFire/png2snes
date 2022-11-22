@@ -254,6 +254,13 @@ uint8_t* convert_to_tiles_8_8(png_structp png_ptr, png_infop info_ptr, unsigned 
     }
   }
 
+  for (size_t i = 0; i < height; i++)
+  {
+    free(row_pointers[i]);
+  }
+
+  free(row_pointers);
+  free(tile);
   return data;
 }
 
